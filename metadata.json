@@ -1,0 +1,5 @@
+{
+  "name": "DocuFlow Converter",
+  "description": "Herramienta profesional para convertir PDFs a texto o Word con instrucciones personalizadas utilizando IA.",
+  "requestFramePermissions": []
+}
