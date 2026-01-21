@@ -21,5 +21,4 @@ export interface FileQueueItem {
 
 export interface ConversionSettings {
   format: OutputFormat;
-  instructions: string;
 }

@@ -1,5 +1,5 @@
 {
-  "name": "DocuFlow Converter",
-  "description": "Herramienta profesional para convertir PDFs a texto o Word con instrucciones personalizadas utilizando IA.",
+  "name": "PDFluye",
+  "description": "Herramienta profesional para convertir PDFs a texto o Word de forma local y segura, sin uso de IA.",
   "requestFramePermissions": []
 }
