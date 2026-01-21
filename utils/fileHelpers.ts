@@ -6,7 +6,6 @@ export const fileToBase64 = (file: File): Promise<string> => {
     reader.readAsDataURL(file);
     reader.onload = () => {
       const result = reader.result as string;
-      // Remove the Data URL prefix (e.g., "data:application/pdf;base64,")
       const base64 = result.split(',')[1];
       resolve(base64);
     };
@@ -20,13 +19,36 @@ export const downloadFile = (filename: string, content: string, format: OutputFo
 
   if (format === OutputFormat.DOC) {
     mimeType = 'application/msword';
-    // Wrap in basic HTML for Word to interpret it correctly
-    finalContent = `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><meta charset='utf-8'><title>Document</title></head>
-      <body>${content.replace(/\n/g, '<br>')}</body>
-      </html>
+    // XML Header to force "Print Layout" (Diseño de Impresión) in MS Word
+    const wordHeader = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' 
+            xmlns:w='urn:schemas-microsoft-com:office:word' 
+            xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset='utf-8'>
+        <title>Document</title>
+        <!--[if gte mso 9]>
+        <xml>
+          <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>100</w:Zoom>
+            <w:DoNotOptimizeForBrowser/>
+          </w:WordDocument>
+        </xml>
+        <![endif]-->
+        <style>
+          body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; }
+          p { margin: 0; padding: 0; }
+          table { border-collapse: collapse; width: 100%; }
+          td { border: 1px solid #ddd; padding: 8px; }
+        </style>
+      </head>
+      <body>
     `;
+    const wordFooter = `</body></html>`;
+    
+    // We assume content is pre-formatted HTML from pdfService
+    finalContent = wordHeader + content + wordFooter;
   }
 
   const blob = new Blob([finalContent], { type: mimeType });
@@ -42,4 +64,20 @@ export const downloadFile = (filename: string, content: string, format: OutputFo
 
 export const generateId = (): string => {
   return Math.random().toString(36).substring(2, 9);
+};
+
+export const shareContent = async (platform: 'whatsapp' | 'telegram' | 'email', text: string, filename: string) => {
+  // Note: Web Share API generally doesn't support sharing File objects to specific apps directly via URL schemes
+  // We will share a message or the text content.
+  
+  const message = `Aquí tienes el archivo convertido: ${filename}`;
+  const encodedMsg = encodeURIComponent(message);
+  
+  if (platform === 'whatsapp') {
+    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+  } else if (platform === 'telegram') {
+    window.open(`https://t.me/share/url?url=${encodedMsg}&text=${encodedMsg}`, '_blank');
+  } else if (platform === 'email') {
+    window.open(`mailto:?subject=Archivo PDFluye: ${filename}&body=${encodedMsg}`, '_blank');
+  }
 };
