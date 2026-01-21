@@ -13,45 +13,32 @@ export const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-export const downloadFile = (filename: string, content: string, format: OutputFormat) => {
-  let mimeType = 'text/plain';
-  let finalContent = content;
+export const downloadFile = async (filename: string, content: any, format: OutputFormat, directoryHandle?: FileSystemDirectoryHandle | null) => {
+  
+  let blob: Blob;
 
-  if (format === OutputFormat.DOC) {
-    mimeType = 'application/msword';
-    // XML Header to force "Print Layout" (Diseño de Impresión) in MS Word
-    const wordHeader = `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' 
-            xmlns:w='urn:schemas-microsoft-com:office:word' 
-            xmlns='http://www.w3.org/TR/REC-html40'>
-      <head>
-        <meta charset='utf-8'>
-        <title>Document</title>
-        <!--[if gte mso 9]>
-        <xml>
-          <w:WordDocument>
-            <w:View>Print</w:View>
-            <w:Zoom>100</w:Zoom>
-            <w:DoNotOptimizeForBrowser/>
-          </w:WordDocument>
-        </xml>
-        <![endif]-->
-        <style>
-          body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; }
-          p { margin: 0; padding: 0; }
-          table { border-collapse: collapse; width: 100%; }
-          td { border: 1px solid #ddd; padding: 8px; }
-        </style>
-      </head>
-      <body>
-    `;
-    const wordFooter = `</body></html>`;
-    
-    // We assume content is pre-formatted HTML from pdfService
-    finalContent = wordHeader + content + wordFooter;
+  // content is already a Blob for DOC, XLS, PPT from our new service
+  if (content instanceof Blob) {
+      blob = content;
+  } else {
+      // It's a string (TXT)
+      blob = new Blob([content], { type: 'text/plain' });
   }
 
-  const blob = new Blob([finalContent], { type: mimeType });
+  // If we have a directory handle (Local Folder selected), write directly
+  if (directoryHandle) {
+    try {
+      const fileHandle = await directoryHandle.getFileHandle(filename, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return; // Saved silently
+    } catch (err) {
+      console.error("Failed to write to local folder, falling back to download", err);
+    }
+  }
+
+  // Fallback: Browser Download
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -64,20 +51,4 @@ export const downloadFile = (filename: string, content: string, format: OutputFo
 
 export const generateId = (): string => {
   return Math.random().toString(36).substring(2, 9);
-};
-
-export const shareContent = async (platform: 'whatsapp' | 'telegram' | 'email', text: string, filename: string) => {
-  // Note: Web Share API generally doesn't support sharing File objects to specific apps directly via URL schemes
-  // We will share a message or the text content.
-  
-  const message = `Aquí tienes el archivo convertido: ${filename}`;
-  const encodedMsg = encodeURIComponent(message);
-  
-  if (platform === 'whatsapp') {
-    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
-  } else if (platform === 'telegram') {
-    window.open(`https://t.me/share/url?url=${encodedMsg}&text=${encodedMsg}`, '_blank');
-  } else if (platform === 'email') {
-    window.open(`mailto:?subject=Archivo PDFluye: ${filename}&body=${encodedMsg}`, '_blank');
-  }
 };

@@ -3,9 +3,15 @@ import React, { useCallback, useState } from 'react';
 interface DropZoneProps {
   onFilesAdded: (files: File[]) => void;
   disabled: boolean;
+  texts: {
+    clickToUpload: string;
+    orDrag: string;
+    onlyPdf: string;
+    alertPdf: string;
+  };
 }
 
-const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, disabled }) => {
+const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, disabled, texts }) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -24,21 +30,18 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, disabled }) => {
     setIsDragOver(false);
     if (disabled) return;
     
-    // Fix: Explicitly type file as File to avoid implicit unknown type error
     const files = Array.from(e.dataTransfer.files).filter((file: File) => file.type === 'application/pdf');
     if (files.length > 0) {
       onFilesAdded(files);
     } else {
-      alert("Por favor, sube solo archivos PDF.");
+      alert(texts.alertPdf);
     }
-  }, [onFilesAdded, disabled]);
+  }, [onFilesAdded, disabled, texts]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (disabled || !e.target.files) return;
-    // Fix: Explicitly type file as File to avoid implicit unknown type error
     const files = Array.from(e.target.files).filter((file: File) => file.type === 'application/pdf');
     onFilesAdded(files);
-    // Reset value to allow uploading the same file again if needed
     e.target.value = '';
   }, [onFilesAdded, disabled]);
 
@@ -74,8 +77,8 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, disabled }) => {
           </svg>
         </div>
         <div className="text-zinc-400">
-          <span className="font-bold text-yellow-400">Haz clic para subir</span> o arrastra tus archivos aquí
-          <p className="text-sm text-zinc-600 mt-1">Solo archivos PDF</p>
+          <span className="font-bold text-yellow-400">{texts.clickToUpload}</span> {texts.orDrag}
+          <p className="text-sm text-zinc-600 mt-1">{texts.onlyPdf}</p>
         </div>
       </div>
     </div>

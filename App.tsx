@@ -3,8 +3,108 @@ import DropZone from './components/DropZone';
 import SettingsPanel from './components/SettingsPanel';
 import QueueList from './components/QueueList';
 import { FileQueueItem, ConversionStatus, OutputFormat, ConversionSettings, GlobalSettings } from './types';
-import { generateId } from './utils/fileHelpers';
+import { generateId, downloadFile } from './utils/fileHelpers';
 import { convertPdfLocal } from './services/pdfService';
+
+// Translation Dictionary
+const translations = {
+  es: {
+    title: 'PDFluye',
+    subtitle: 'Procesamiento 100% Local',
+    heroTitle: 'Fluye de PDF a Todo sin límites',
+    heroDesc: 'Transforma documentos PDF a formatos editables (Word, Excel, PowerPoint) en tu dispositivo.',
+    convert: 'Convertir',
+    files: 'Archivo(s)',
+    settings: 'Ajustes',
+    lang: 'Idioma',
+    dest: 'Carpeta de Salida',
+    processing: 'Procesando',
+    clickToUpload: 'Haz clic para subir',
+    orDrag: 'o arrastra tus archivos aquí',
+    onlyPdf: 'Solo archivos PDF',
+    alertPdf: 'Por favor, sube solo archivos PDF.',
+    queue: 'Cola de Archivos',
+    clear: 'Limpiar Todo',
+    download: 'Descargar',
+    delete: 'Eliminar',
+    completed: 'Completado',
+    error: 'Error',
+    stgsTitle: 'Configuración de Conversión',
+    stgsFormat: 'Formato de Salida',
+    fmtTxt: 'Texto (.txt)',
+    fmtDoc: 'Word (.docx)',
+    fmtXls: 'Excel (.xlsx)',
+    fmtPpt: 'PowerPoint (.pptx)',
+    local: 'Local',
+    drive: 'Google Drive',
+    driveAuth: 'Autenticación con Google Drive',
+    driveMsg: 'Esto abriría el selector de cuentas de Google para elegir tu carpeta de Drive. (Simulación: Requiere API Key configurada).'
+  },
+  en: {
+    title: 'PDFluye',
+    subtitle: '100% Local Processing',
+    heroTitle: 'Flow from PDF to Everything',
+    heroDesc: 'Transform PDF documents into editable formats (Word, Excel, PowerPoint) on your device.',
+    convert: 'Convert',
+    files: 'File(s)',
+    settings: 'Settings',
+    lang: 'Language',
+    dest: 'Output Folder',
+    processing: 'Processing',
+    clickToUpload: 'Click to upload',
+    orDrag: 'or drag your files here',
+    onlyPdf: 'PDF files only',
+    alertPdf: 'Please upload only PDF files.',
+    queue: 'File Queue',
+    clear: 'Clear All',
+    download: 'Download',
+    delete: 'Delete',
+    completed: 'Completed',
+    error: 'Error',
+    stgsTitle: 'Conversion Settings',
+    stgsFormat: 'Output Format',
+    fmtTxt: 'Text (.txt)',
+    fmtDoc: 'Word (.docx)',
+    fmtXls: 'Excel (.xlsx)',
+    fmtPpt: 'PowerPoint (.pptx)',
+    local: 'Local',
+    drive: 'Google Drive',
+    driveAuth: 'Google Drive Authentication',
+    driveMsg: 'This would open the Google account picker to select your Drive folder. (Simulation: Requires Configured API Key).'
+  },
+  pt: {
+    title: 'PDFluye',
+    subtitle: 'Processamento 100% Local',
+    heroTitle: 'Flui de PDF para Tudo',
+    heroDesc: 'Transforme documentos PDF em formatos editáveis (Word, Excel, PowerPoint) no seu dispositivo.',
+    convert: 'Converter',
+    files: 'Arquivo(s)',
+    settings: 'Configurações',
+    lang: 'Idioma',
+    dest: 'Pasta de Saída',
+    processing: 'Processando',
+    clickToUpload: 'Clique para enviar',
+    orDrag: 'ou arraste seus arquivos',
+    onlyPdf: 'Apenas arquivos PDF',
+    alertPdf: 'Por favor, envie apenas arquivos PDF.',
+    queue: 'Fila de Arquivos',
+    clear: 'Limpar Tudo',
+    download: 'Baixar',
+    delete: 'Excluir',
+    completed: 'Concluído',
+    error: 'Erro',
+    stgsTitle: 'Configuração de Conversão',
+    stgsFormat: 'Formato de Saída',
+    fmtTxt: 'Texto (.txt)',
+    fmtDoc: 'Word (.docx)',
+    fmtXls: 'Excel (.xlsx)',
+    fmtPpt: 'PowerPoint (.pptx)',
+    local: 'Local',
+    drive: 'Google Drive',
+    driveAuth: 'Autenticação Google Drive',
+    driveMsg: 'Isso abriria o seletor de contas do Google para escolher sua pasta do Drive. (Simulação: Requer API Key configurada).'
+  }
+};
 
 const App: React.FC = () => {
   const [queue, setQueue] = useState<FileQueueItem[]>([]);
@@ -18,20 +118,34 @@ const App: React.FC = () => {
     destination: 'local'
   });
 
+  const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Translations
-  const t = {
-    title: 'PDFluye',
-    subtitle: globalSettings.language === 'pt' ? 'Processamento Local 100%' : globalSettings.language === 'en' ? '100% Local Processing' : 'Procesamiento 100% Local',
-    heroTitle: globalSettings.language === 'pt' ? 'Flui de PDF para Texto' : globalSettings.language === 'en' ? 'Flow from PDF to Text' : 'Fluye de PDF a Texto sin límites',
-    heroDesc: globalSettings.language === 'pt' ? 'Transforme PDFs em formatos editáveis instantaneamente no seu navegador. Privado, rápido e sem IA.' : globalSettings.language === 'en' ? 'Instantly transform PDFs into editable formats in your browser. Private, fast, and no AI.' : 'Transforma documentos PDF a formatos editables instantáneamente en tu navegador. Privado, rápido y sin uso de IA.',
-    convert: globalSettings.language === 'pt' ? 'Converter' : globalSettings.language === 'en' ? 'Convert' : 'Convertir',
-    files: globalSettings.language === 'pt' ? 'Arquivo(s)' : globalSettings.language === 'en' ? 'File(s)' : 'Archivo',
-    settings: globalSettings.language === 'pt' ? 'Configurações' : globalSettings.language === 'en' ? 'Settings' : 'Ajustes',
-    lang: globalSettings.language === 'pt' ? 'Idioma' : globalSettings.language === 'en' ? 'Language' : 'Idioma',
-    dest: globalSettings.language === 'pt' ? 'Pasta de Saída' : globalSettings.language === 'en' ? 'Output Folder' : 'Carpeta de Salida',
-    processing: globalSettings.language === 'pt' ? 'Processando' : globalSettings.language === 'en' ? 'Processing' : 'Procesando',
+  const t = translations[globalSettings.language];
+
+  // Logic for selecting local folder
+  const handleLocalFolderSelect = async () => {
+      setGlobalSettings(prev => ({ ...prev, destination: 'local' }));
+      if ('showDirectoryPicker' in window) {
+          try {
+              const handle = await window.showDirectoryPicker();
+              setDirectoryHandle(handle);
+          } catch (e) {
+              console.log("User cancelled folder selection");
+          }
+      } else {
+          alert("Tu navegador no soporta selección de carpetas avanzada. Los archivos se guardarán en Descargas.");
+      }
+  };
+
+  // Logic for Drive (Simulation)
+  const handleDriveSelect = () => {
+      setGlobalSettings(prev => ({ ...prev, destination: 'drive' }));
+      // Simulate Auth Flow
+      setTimeout(() => {
+          alert(`${t.driveAuth}\n\n${t.driveMsg}`);
+      }, 300);
+      setDirectoryHandle(null); // Reset local handle
   };
 
   const handleFilesAdded = useCallback((files: File[]) => {
@@ -39,10 +153,9 @@ const App: React.FC = () => {
       id: generateId(),
       file,
       status: ConversionStatus.IDLE,
-      convertedName: file.name.replace('.pdf', `.${settings.format}`),
+      convertedName: file.name.replace(/\.pdf$/i, `.${settings.format}`),
       timestamp: Date.now()
     }));
-    // Newest files first (prepend)
     setQueue(prev => [...newItems, ...prev]);
   }, [settings.format]);
 
@@ -56,19 +169,21 @@ const App: React.FC = () => {
 
   const processQueue = async () => {
     setIsProcessing(true);
-    
-    // Determine which items to process (usually from top down, or all idle)
-    // Since we display newest first, we process queue naturally.
     const itemsToProcess = queue.filter(item => item.status === ConversionStatus.IDLE);
     
     for (const item of itemsToProcess) {
       setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: ConversionStatus.PROCESSING } : q));
 
       try {
-        const extension = settings.format === OutputFormat.DOC ? 'doc' : 'txt';
-        const convertedName = item.file.name.replace(/\.pdf$/i, `.${extension}`);
+        const ext = settings.format; // txt, docx, xlsx, pptx
+        const convertedName = item.file.name.replace(/\.pdf$/i, `.${ext}`);
 
         const result = await convertPdfLocal(item.file, settings);
+
+        // Auto-save if directory handle exists
+        if (directoryHandle) {
+             await downloadFile(convertedName, result, settings.format, directoryHandle);
+        }
 
         setQueue(prev => prev.map(q => q.id === item.id ? {
           ...q,
@@ -118,7 +233,7 @@ const App: React.FC = () => {
                 </button>
                 
                 {isSettingsOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-40 p-4 animate-fade-in">
+                    <div className="absolute right-0 mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-40 p-4 animate-fade-in">
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-zinc-500 uppercase mb-2">{t.lang}</label>
@@ -136,18 +251,23 @@ const App: React.FC = () => {
                                 <label className="block text-xs font-bold text-zinc-500 uppercase mb-2">{t.dest}</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button 
-                                        onClick={() => setGlobalSettings({...globalSettings, destination: 'local'})}
-                                        className={`p-2 text-xs rounded-lg border font-medium ${globalSettings.destination === 'local' ? 'border-yellow-400 bg-yellow-400/10 text-yellow-400' : 'border-zinc-700 bg-zinc-800 text-zinc-400'}`}
+                                        onClick={handleLocalFolderSelect}
+                                        className={`p-2 text-xs rounded-lg border font-medium flex items-center justify-center gap-1 ${globalSettings.destination === 'local' ? 'border-yellow-400 bg-yellow-400/10 text-yellow-400' : 'border-zinc-700 bg-zinc-800 text-zinc-400'}`}
                                     >
-                                        Local
+                                        {directoryHandle ? '✓' : ''} {t.local}
                                     </button>
                                     <button 
-                                        onClick={() => setGlobalSettings({...globalSettings, destination: 'drive'})}
+                                        onClick={handleDriveSelect}
                                         className={`p-2 text-xs rounded-lg border font-medium ${globalSettings.destination === 'drive' ? 'border-yellow-400 bg-yellow-400/10 text-yellow-400' : 'border-zinc-700 bg-zinc-800 text-zinc-400'}`}
                                     >
-                                        Drive
+                                        {t.drive}
                                     </button>
                                 </div>
+                                {directoryHandle && (
+                                    <p className="mt-2 text-[10px] text-green-400 truncate">
+                                        Carpeta seleccionada: {directoryHandle.name}
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -171,10 +291,29 @@ const App: React.FC = () => {
           settings={settings} 
           setSettings={setSettings} 
           disabled={isProcessing} 
+          texts={{
+              title: t.stgsTitle,
+              format: t.stgsFormat,
+              formats: {
+                  txt: t.fmtTxt,
+                  doc: t.fmtDoc,
+                  xls: t.fmtXls,
+                  ppt: t.fmtPpt
+              }
+          }}
         />
 
         {/* Upload Area */}
-        <DropZone onFilesAdded={handleFilesAdded} disabled={isProcessing} />
+        <DropZone 
+            onFilesAdded={handleFilesAdded} 
+            disabled={isProcessing} 
+            texts={{
+                clickToUpload: t.clickToUpload,
+                orDrag: t.orDrag,
+                onlyPdf: t.onlyPdf,
+                alertPdf: t.alertPdf
+            }}
+        />
 
         {/* Action Button */}
         {pendingCount > 0 && (
@@ -215,6 +354,16 @@ const App: React.FC = () => {
           onClearAll={handleClearAll}
           format={settings.format}
           language={globalSettings.language}
+          texts={{
+              queue: t.queue,
+              clear: t.clear,
+              download: t.download,
+              delete: t.delete,
+              processing: t.processing,
+              completed: t.completed,
+              error: t.error
+          }}
+          directoryHandle={directoryHandle}
         />
       </main>
     </div>
