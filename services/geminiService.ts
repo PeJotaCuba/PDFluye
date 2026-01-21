@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { OutputFormat } from "../types";
+import { OutputFormat, ConversionSettings } from "../types";
 
 // Initialize Gemini Client
 // IMPORTANT: The API key is obtained exclusively from process.env.API_KEY
@@ -7,7 +7,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const convertPdfContent = async (
   base64Data: string, 
-  settings: { format: OutputFormat; instructions: string }
+  settings: ConversionSettings
 ): Promise<string> => {
   
   const formatInstruction = settings.format === OutputFormat.DOC 
@@ -33,7 +33,7 @@ export const convertPdfContent = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-latest', // Using 2.5 Flash as it is robust for multimodal document tasks
+      model: 'gemini-3-flash-preview', // Using Gemini 3 Flash as it is robust for multimodal document tasks
       contents: {
         parts: [
           {

@@ -7,19 +7,16 @@ export enum ConversionStatus {
 
 export enum OutputFormat {
   TXT = 'txt',
-  DOC = 'docx', 
-  XLS = 'xlsx',
-  PPT = 'pptx'
+  DOC = 'doc',
+  XLS = 'xls',
+  PPT = 'ppt'
 }
-
-export type Language = 'es' | 'en' | 'pt';
-export type StorageLocation = 'local' | 'drive';
 
 export interface FileQueueItem {
   id: string;
   file: File;
   status: ConversionStatus;
-  resultContent?: any; // Can be string, Blob, or Buffer depending on library
+  resultContent?: string;
   errorMessage?: string;
   convertedName: string;
   timestamp: number;
@@ -27,14 +24,10 @@ export interface FileQueueItem {
 
 export interface ConversionSettings {
   format: OutputFormat;
+  instructions: string;
 }
 
-export interface GlobalSettings {
-  language: Language;
-  destination: StorageLocation;
-}
-
-// Global declaration for File System Access API
+// Global declaration for File System Access API (Optional support kept in types but simplified usage)
 declare global {
   interface Window {
     showDirectoryPicker(): Promise<FileSystemDirectoryHandle>;

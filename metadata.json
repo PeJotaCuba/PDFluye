@@ -1,5 +1,5 @@
 {
-  "name": "PDFluye",
-  "description": "Herramienta profesional para convertir PDFs a texto o Word de forma local y segura, sin uso de IA.",
+  "name": "PDFluye - Conversor TXT",
+  "description": "Herramienta especializada para extraer texto plano de PDFs manteniendo el formato de líneas.",
   "requestFramePermissions": []
 }

@@ -20,7 +20,7 @@ interface QueueListProps {
   directoryHandle: any;
 }
 
-const QueueList: React.FC<QueueListProps> = ({ items, onRemove, onClearAll, format, texts, directoryHandle }) => {
+const QueueList: React.FC<QueueListProps> = ({ items, onRemove, onClearAll, format, texts }) => {
   
   if (items.length === 0) return null;
 
@@ -89,7 +89,7 @@ const QueueList: React.FC<QueueListProps> = ({ items, onRemove, onClearAll, form
                 
                 {item.status === ConversionStatus.COMPLETED && (
                     <button
-                        onClick={() => downloadFile(item.convertedName, item.resultContent, format, directoryHandle)}
+                        onClick={() => downloadFile(item.convertedName, item.resultContent!, format)}
                         className="p-2 rounded-lg bg-yellow-400 text-black hover:bg-yellow-300 transition-all font-bold text-xs flex items-center gap-1"
                         title={texts.download}
                     >

@@ -13,32 +13,8 @@ export const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-export const downloadFile = async (filename: string, content: any, format: OutputFormat, directoryHandle?: FileSystemDirectoryHandle | null) => {
-  
-  let blob: Blob;
-
-  // content is already a Blob for DOC, XLS, PPT from our new service
-  if (content instanceof Blob) {
-      blob = content;
-  } else {
-      // It's a string (TXT)
-      blob = new Blob([content], { type: 'text/plain' });
-  }
-
-  // If we have a directory handle (Local Folder selected), write directly
-  if (directoryHandle) {
-    try {
-      const fileHandle = await directoryHandle.getFileHandle(filename, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return; // Saved silently
-    } catch (err) {
-      console.error("Failed to write to local folder, falling back to download", err);
-    }
-  }
-
-  // Fallback: Browser Download
+export const downloadFile = async (filename: string, content: string, format: OutputFormat) => {
+  const blob = new Blob([content], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
