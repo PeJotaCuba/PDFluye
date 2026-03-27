@@ -49,12 +49,28 @@ const QueueList: React.FC<QueueListProps> = ({ items, onRemove, onClearAll, form
     <div className="bg-zinc-900 rounded-xl shadow-lg shadow-black/20 border border-zinc-800 overflow-visible mt-6">
       <div className="bg-zinc-800/50 px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
         <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">{texts.queue} ({items.length})</h3>
-        <button 
-            onClick={onClearAll}
-            className="text-xs font-bold text-red-400 hover:text-red-300 transition-colors"
-        >
-            {texts.clear}
-        </button>
+        <div className="flex items-center gap-4">
+          {items.filter(i => i.status === ConversionStatus.COMPLETED).length > 1 && (
+            <button 
+                onClick={() => {
+                  items.forEach(item => {
+                    if (item.status === ConversionStatus.COMPLETED && item.resultContent) {
+                      downloadFile(item.convertedName, item.resultContent, format);
+                    }
+                  });
+                }}
+                className="text-xs font-bold text-yellow-400 hover:text-yellow-300 transition-colors"
+            >
+                Descargar todo
+            </button>
+          )}
+          <button 
+              onClick={onClearAll}
+              className="text-xs font-bold text-red-400 hover:text-red-300 transition-colors"
+          >
+              {texts.clear}
+          </button>
+        </div>
       </div>
       <ul className="divide-y divide-zinc-800">
         {items.map((item) => (
