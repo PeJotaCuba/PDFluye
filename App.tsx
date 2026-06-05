@@ -2,73 +2,103 @@ import React, { useState, useCallback } from 'react';
 import DropZone from './components/DropZone';
 import QueueList from './components/QueueList';
 import { FileQueueItem, ConversionStatus, OutputFormat } from './types';
-import { generateId, downloadFile } from './utils/fileHelpers';
+import { generateId } from './utils/fileHelpers';
 import { convertPdfLocal } from './services/pdfService';
+import { convertWordToPdfLocal } from './services/wordService';
 
 const App: React.FC = () => {
+  const [currentScreen, setCurrentScreen] = useState<'pdf-to-txt' | 'docx-to-pdf'>('pdf-to-txt');
   const [queue, setQueue] = useState<FileQueueItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // Hardcoded Spanish texts
+  // Hardcoded Spanish texts dynamically adapted to the screen
   const t = {
     title: 'PDFluye',
-    subtitle: 'Conversor PDF a TXT',
-    heroTitle: 'Extracción de Texto Simple y Limpia',
-    heroDesc: 'Convierte tus documentos PDF a archivos de texto plano (.txt) manteniendo el formato de líneas original.',
-    convert: 'Convertir a TXT',
+    subtitle: currentScreen === 'pdf-to-txt' ? 'Conversor PDF a TXT' : 'Conversor DOCX a PDF',
+    heroTitle: currentScreen === 'pdf-to-txt' ? 'Extracción de Texto Simple y Limpia' : 'Conversor DOCX a PDF de Alta Fidelidad',
+    heroDesc: currentScreen === 'pdf-to-txt' 
+      ? 'Convierte tus documentos PDF a archivos de texto plano (.txt) manteniendo el formato de líneas original.' 
+      : 'Convierte tus documentos DOCX (.docx) a archivos PDF vectorizados de alta calidad y alta fidelidad.',
+    convert: currentScreen === 'pdf-to-txt' ? 'Convertir a TXT' : 'Convertir a PDF',
     files: 'Archivo(s)',
     processing: 'Procesando...',
     clickToUpload: 'Haz clic para subir',
     orDrag: 'o arrastra tus archivos aquí',
-    onlyPdf: 'Solo archivos PDF',
-    alertPdf: 'Por favor, sube solo archivos PDF.',
-    queue: 'Cola de Archivos',
+    onlyPdf: currentScreen === 'pdf-to-txt' ? 'Solo archivos PDF (.pdf)' : 'Solo archivos DOCX (.docx)',
+    alertPdf: currentScreen === 'pdf-to-txt' ? 'Por favor, sube solo archivos PDF.' : 'Por favor, sube solo archivos DOCX (.docx).',
+    queue: currentScreen === 'pdf-to-txt' ? 'Cola de Archivos (PDF a TXT)' : 'Cola de Archivos (DOCX a PDF)',
     clear: 'Limpiar Todo',
-    download: 'Descargar .txt',
+    download: currentScreen === 'pdf-to-txt' ? 'Descargar .txt' : 'Descargar .pdf',
     delete: 'Eliminar',
     completed: 'Completado',
     error: 'Error'
   };
 
   const handleFilesAdded = useCallback((files: File[]) => {
-    const newItems: FileQueueItem[] = files.map(file => ({
-      id: generateId(),
-      file,
-      status: ConversionStatus.IDLE,
-      convertedName: file.name.replace(/\.pdf$/i, `.txt`),
-      timestamp: Date.now()
-    }));
+    const newItems: FileQueueItem[] = files.map(file => {
+      let convertedName = "";
+      if (currentScreen === 'pdf-to-txt') {
+        convertedName = file.name.replace(/\.pdf$/i, '.txt');
+        // fallback in case replacement was skipped due to case sensitivity
+        if (!convertedName.endsWith('.txt')) {
+          convertedName += '.txt';
+        }
+      } else {
+        // replace extension with .pdf
+        convertedName = file.name.replace(/\.docx$/i, '') + '.pdf';
+      }
+      
+      return {
+        id: generateId(),
+        file,
+        type: currentScreen,
+        status: ConversionStatus.IDLE,
+        convertedName,
+        timestamp: Date.now()
+      };
+    });
     setQueue(prev => [...newItems, ...prev]);
-  }, []);
+  }, [currentScreen]);
 
   const handleRemoveItem = useCallback((id: string) => {
     setQueue(prev => prev.filter(item => item.id !== id));
   }, []);
 
   const handleClearAll = useCallback(() => {
-    setQueue([]);
-  }, []);
+    // Clear only elements of the selected screen segment
+    setQueue(prev => prev.filter(item => item.type !== currentScreen));
+  }, [currentScreen]);
 
   const processQueue = async () => {
     setIsProcessing(true);
-    const itemsToProcess = queue.filter(item => item.status === ConversionStatus.IDLE);
+    
+    // Process only IDLE items belonging to the active flow screen
+    const itemsToProcess = queue.filter(
+      item => item.status === ConversionStatus.IDLE && item.type === currentScreen
+    );
     
     for (const item of itemsToProcess) {
       setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: ConversionStatus.PROCESSING } : q));
 
       try {
-        const result = await convertPdfLocal(item.file);
-        
-        // Auto download is optional, but user requested specific format output.
-        // We will stick to manual download to let user review in the list first, 
-        // or trigger it if desired. Sticking to QueueList logic.
-
-        setQueue(prev => prev.map(q => q.id === item.id ? {
-          ...q,
-          status: ConversionStatus.COMPLETED,
-          resultContent: result,
-          convertedName: item.convertedName
-        } : q));
+        if (item.type === 'pdf-to-txt') {
+          const result = await convertPdfLocal(item.file);
+          setQueue(prev => prev.map(q => q.id === item.id ? {
+            ...q,
+            status: ConversionStatus.COMPLETED,
+            resultContent: result,
+            convertedName: item.convertedName
+          } : q));
+        } else {
+          // docx-to-pdf conversion using client-side mammoth helper
+          const resultBlob = await convertWordToPdfLocal(item.file);
+          setQueue(prev => prev.map(q => q.id === item.id ? {
+            ...q,
+            status: ConversionStatus.COMPLETED,
+            resultBlob: resultBlob,
+            convertedName: item.convertedName
+          } : q));
+        }
 
       } catch (error) {
         setQueue(prev => prev.map(q => q.id === item.id ? {
@@ -82,15 +112,17 @@ const App: React.FC = () => {
     setIsProcessing(false);
   };
 
-  const pendingCount = queue.filter(item => item.status === ConversionStatus.IDLE).length;
+  // Filter queue elements as segment per current screen
+  const filteredQueue = queue.filter(item => item.type === currentScreen);
+  const pendingCount = filteredQueue.filter(item => item.status === ConversionStatus.IDLE).length;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-20 selection:bg-yellow-400 selection:text-black font-inter">
+    <div className="relative z-10 min-h-screen bg-zinc-950 text-zinc-100 pb-20 selection:bg-yellow-400 selection:text-black font-inter">
       {/* Header */}
       <header className="bg-zinc-900 border-b border-zinc-800 sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-yellow-400 text-black p-1.5 rounded-lg">
+            <div className="bg-yellow-400 text-black p-1.5 rounded-lg shadow-md shadow-yellow-400/10">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
             </div>
             <h1 className="text-xl font-bold text-white tracking-tight">{t.title}</h1>
@@ -106,9 +138,39 @@ const App: React.FC = () => {
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         
-        <div className="mb-10 text-center">
-          <h2 className="text-3xl font-bold text-white mb-3">{t.heroTitle}</h2>
-          <p className="text-zinc-400">
+        {/* Navigation Tab Switcher */}
+        <div className="flex bg-zinc-900/80 border border-zinc-800 p-1.5 rounded-xl mb-12 w-full max-w-md mx-auto shadow-xl">
+          <button
+            onClick={() => setCurrentScreen('pdf-to-txt')}
+            disabled={isProcessing}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-sm transition-all focus:outline-none ${
+              currentScreen === 'pdf-to-txt'
+                ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+            } ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            id="tab-pdf-to-txt"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+            PDF a TXT
+          </button>
+          <button
+            onClick={() => setCurrentScreen('docx-to-pdf')}
+            disabled={isProcessing}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-sm transition-all focus:outline-none ${
+              currentScreen === 'docx-to-pdf'
+                ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+            } ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            id="tab-docx-to-pdf"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2a2 2 0 1 0 0-4H8v8"/><path d="M12 13h2a2 2 0 1 0 0-4h-2v8"/></svg>
+            DOCX a PDF
+          </button>
+        </div>
+
+        <div className="mb-10 text-center animate-fade-in">
+          <h2 className="text-3xl font-bold text-white mb-3 tracking-tight">{t.heroTitle}</h2>
+          <p className="text-zinc-400 text-base max-w-xl mx-auto">
             {t.heroDesc}
           </p>
         </div>
@@ -117,6 +179,7 @@ const App: React.FC = () => {
         <DropZone 
             onFilesAdded={handleFilesAdded} 
             disabled={isProcessing} 
+            accept={currentScreen === 'pdf-to-txt' ? '.pdf' : '.docx'}
             texts={{
                 clickToUpload: t.clickToUpload,
                 orDrag: t.orDrag,
@@ -132,12 +195,13 @@ const App: React.FC = () => {
               onClick={processQueue}
               disabled={isProcessing}
               className={`
-                flex items-center gap-3 px-8 py-4 rounded-xl font-bold text-lg shadow-lg shadow-yellow-400/20 transition-all w-full sm:w-auto justify-center
+                flex items-center gap-3 px-8 py-4 rounded-xl font-bold text-lg shadow-lg shadow-yellow-400/20 transition-all w-full sm:w-auto justify-center cursor-pointer
                 ${isProcessing 
                   ? 'bg-yellow-600 text-yellow-200 cursor-wait' 
                   : 'bg-yellow-400 text-black hover:bg-yellow-300 hover:shadow-yellow-400/40 hover:-translate-y-1'
                 }
               `}
+              id="btn-process-queue"
             >
               {isProcessing ? (
                 <>
@@ -159,10 +223,10 @@ const App: React.FC = () => {
 
         {/* Queue / Results */}
         <QueueList 
-          items={queue} 
+          items={filteredQueue} 
           onRemove={handleRemoveItem} 
           onClearAll={handleClearAll}
-          format={OutputFormat.TXT}
+          format={currentScreen === 'pdf-to-txt' ? OutputFormat.TXT : OutputFormat.PDF}
           language="es"
           texts={{
               queue: t.queue,

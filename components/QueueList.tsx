@@ -50,16 +50,33 @@ const QueueList: React.FC<QueueListProps> = ({ items, onRemove, onClearAll, form
       <div className="bg-zinc-800/50 px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
         <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">{texts.queue} ({items.length})</h3>
         <div className="flex items-center gap-4">
-          {items.filter(i => i.status === ConversionStatus.COMPLETED).length > 1 && (
+          {items.filter(i => i.status === ConversionStatus.COMPLETED && (i.resultContent || i.resultBlob)).length > 1 && (
             <button 
-                onClick={() => {
-                  items.forEach(item => {
-                    if (item.status === ConversionStatus.COMPLETED && item.resultContent) {
-                      downloadFile(item.convertedName, item.resultContent, format);
+                onClick={async () => {
+                  const completedItems = items.filter(
+                    item => item.status === ConversionStatus.COMPLETED && (item.resultContent || item.resultBlob)
+                  );
+                  let downloadedCount = 0;
+                  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+                  
+                  for (const item of completedItems) {
+                    try {
+                      const content = item.resultBlob || item.resultContent || "";
+                      const itemFormat = item.convertedName.toLowerCase().endsWith('.pdf') ? OutputFormat.PDF : format;
+                      await downloadFile(item.convertedName, content, itemFormat);
+                      downloadedCount++;
+                      // Sequential delay to bypass browser block of massive simultaneous downloads
+                      await delay(600);
+                    } catch (err) {
+                      console.error("Error al descargar item masivo:", err);
                     }
-                  });
+                  }
+                  
+                  // Alert dialog summarizing balance as requested
+                  alert(`Descarga completada.\n\nBalance:\n• Total en cola: ${items.length}\n• Convertidos: ${completedItems.length}\n• Descargados: ${downloadedCount}`);
                 }}
                 className="text-xs font-bold text-yellow-400 hover:text-yellow-300 transition-colors"
+                id="btn-download-all"
             >
                 Descargar todo
             </button>
@@ -67,6 +84,7 @@ const QueueList: React.FC<QueueListProps> = ({ items, onRemove, onClearAll, form
           <button 
               onClick={onClearAll}
               className="text-xs font-bold text-red-400 hover:text-red-300 transition-colors"
+              id="btn-clear-all"
           >
               {texts.clear}
           </button>
@@ -105,9 +123,14 @@ const QueueList: React.FC<QueueListProps> = ({ items, onRemove, onClearAll, form
                 
                 {item.status === ConversionStatus.COMPLETED && (
                     <button
-                        onClick={() => downloadFile(item.convertedName, item.resultContent!, format)}
+                        onClick={() => {
+                          const content = item.resultBlob || item.resultContent || "";
+                          const itemFormat = item.convertedName.toLowerCase().endsWith('.pdf') ? OutputFormat.PDF : format;
+                          downloadFile(item.convertedName, content, itemFormat);
+                        }}
                         className="p-2 rounded-lg bg-yellow-400 text-black hover:bg-yellow-300 transition-all font-bold text-xs flex items-center gap-1"
                         title={texts.download}
+                        id={`btn-download-${item.id}`}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         {texts.download}

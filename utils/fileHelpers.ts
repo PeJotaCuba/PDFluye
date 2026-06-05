@@ -13,8 +13,15 @@ export const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-export const downloadFile = async (filename: string, content: string, format: OutputFormat) => {
-  const blob = new Blob([content], { type: 'text/plain' });
+export const downloadFile = async (filename: string, content: string | Blob, format: OutputFormat) => {
+  let blob: Blob;
+  if (content instanceof Blob) {
+    blob = content;
+  } else {
+    blob = new Blob([content], { 
+      type: format === OutputFormat.PDF ? 'application/pdf' : 'text/plain;charset=utf-8' 
+    });
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -22,7 +29,12 @@ export const downloadFile = async (filename: string, content: string, format: Ou
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  
+  // Use a delay for URL revocation. Immediate revocation often aborts download in some modern browsers, 
+  // especially when triggering multiple downloads sequentially.
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 12000);
 };
 
 export const generateId = (): string => {

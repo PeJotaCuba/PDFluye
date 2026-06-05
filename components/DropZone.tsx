@@ -9,10 +9,17 @@ interface DropZoneProps {
     onlyPdf: string;
     alertPdf: string;
   };
+  accept?: string; // Optional accept string, e.g. ".pdf" or ".docx,.doc"
 }
 
-const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, disabled, texts }) => {
+const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, disabled, texts, accept = '.pdf' }) => {
   const [isDragOver, setIsDragOver] = useState(false);
+
+  const isAcceptedFile = (file: File): boolean => {
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+    const accepts = accept.split(',').map(s => s.trim().toLowerCase());
+    return accepts.includes(fileExtension);
+  };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -30,20 +37,24 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, disabled, texts }) =>
     setIsDragOver(false);
     if (disabled) return;
     
-    const files = Array.from(e.dataTransfer.files).filter((file: File) => file.type === 'application/pdf');
+    const files = Array.from(e.dataTransfer.files).filter(isAcceptedFile);
     if (files.length > 0) {
       onFilesAdded(files);
     } else {
       alert(texts.alertPdf);
     }
-  }, [onFilesAdded, disabled, texts]);
+  }, [onFilesAdded, disabled, texts, accept]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (disabled || !e.target.files) return;
-    const files = Array.from(e.target.files).filter((file: File) => file.type === 'application/pdf');
-    onFilesAdded(files);
+    const files = Array.from(e.target.files).filter(isAcceptedFile);
+    if (files.length > 0) {
+      onFilesAdded(files);
+    } else {
+      alert(texts.alertPdf);
+    }
     e.target.value = '';
-  }, [onFilesAdded, disabled]);
+  }, [onFilesAdded, disabled, texts, accept]);
 
   return (
     <div
@@ -61,7 +72,7 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, disabled, texts }) =>
       <input
         type="file"
         multiple
-        accept=".pdf"
+        accept={accept}
         onChange={handleFileInput}
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
         disabled={disabled}

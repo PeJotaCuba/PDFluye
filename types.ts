@@ -9,7 +9,8 @@ export enum OutputFormat {
   TXT = 'txt',
   DOC = 'doc',
   XLS = 'xls',
-  PPT = 'ppt'
+  PPT = 'ppt',
+  PDF = 'pdf'
 }
 
 export interface FileQueueItem {
@@ -17,9 +18,11 @@ export interface FileQueueItem {
   file: File;
   status: ConversionStatus;
   resultContent?: string;
+  resultBlob?: Blob;
   errorMessage?: string;
   convertedName: string;
   timestamp: number;
+  type: 'pdf-to-txt' | 'docx-to-pdf';
 }
 
 export interface ConversionSettings {
