@@ -5,30 +5,49 @@ import { FileQueueItem, ConversionStatus, OutputFormat } from './types';
 import { generateId } from './utils/fileHelpers';
 import { convertPdfLocal } from './services/pdfService';
 import { convertWordToPdfLocal } from './services/wordService';
+import { convertWordToTxtLocal } from './services/wordToTxtService';
 
 const App: React.FC = () => {
-  const [currentScreen, setCurrentScreen] = useState<'pdf-to-txt' | 'docx-to-pdf'>('pdf-to-txt');
+  const [currentScreen, setCurrentScreen] = useState<'pdf-to-txt' | 'docx-to-pdf' | 'docx-to-txt'>('pdf-to-txt');
   const [queue, setQueue] = useState<FileQueueItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   
   // Hardcoded Spanish texts dynamically adapted to the screen
   const t = {
     title: 'PDFluye',
-    subtitle: currentScreen === 'pdf-to-txt' ? 'Conversor PDF a TXT' : 'Conversor DOCX a PDF',
-    heroTitle: currentScreen === 'pdf-to-txt' ? 'Extracción de Texto Simple y Limpia' : 'Conversor DOCX a PDF de Alta Fidelidad',
+    subtitle: currentScreen === 'pdf-to-txt' 
+      ? 'Conversor PDF a TXT' 
+      : currentScreen === 'docx-to-pdf' 
+        ? 'Conversor DOCX a PDF' 
+        : 'Conversor DOCX a TXT (Tablas)',
+    heroTitle: currentScreen === 'pdf-to-txt' 
+      ? 'Extracción de Texto Simple y Limpia' 
+      : currentScreen === 'docx-to-pdf' 
+        ? 'Conversor DOCX a PDF de Alta Fidelidad' 
+        : 'Conversor DOCX a TXT Estructurado',
     heroDesc: currentScreen === 'pdf-to-txt' 
       ? 'Convierte tus documentos PDF a archivos de texto plano (.txt) manteniendo el formato de líneas original.' 
-      : 'Convierte tus documentos DOCX (.docx) a archivos PDF vectorizados de alta calidad y alta fidelidad.',
-    convert: currentScreen === 'pdf-to-txt' ? 'Convertir a TXT' : 'Convertir a PDF',
+      : currentScreen === 'docx-to-pdf'
+        ? 'Convierte tus documentos DOCX (.docx) a archivos PDF vectorizados de alta calidad y alta fidelidad.'
+        : 'Convierte informes con tablas DOCX (.docx) a archivos TXT estructurados optimizados para otros sistemas.',
+    convert: currentScreen === 'pdf-to-txt' 
+      ? 'Convertir a TXT' 
+      : currentScreen === 'docx-to-pdf' 
+        ? 'Convertir a PDF' 
+        : 'Convertir a TXT',
     files: 'Archivo(s)',
     processing: 'Procesando...',
     clickToUpload: 'Haz clic para subir',
     orDrag: 'o arrastra tus archivos aquí',
     onlyPdf: currentScreen === 'pdf-to-txt' ? 'Solo archivos PDF (.pdf)' : 'Solo archivos DOCX (.docx)',
     alertPdf: currentScreen === 'pdf-to-txt' ? 'Por favor, sube solo archivos PDF.' : 'Por favor, sube solo archivos DOCX (.docx).',
-    queue: currentScreen === 'pdf-to-txt' ? 'Cola de Archivos (PDF a TXT)' : 'Cola de Archivos (DOCX a PDF)',
+    queue: currentScreen === 'pdf-to-txt' 
+      ? 'Cola de Archivos (PDF a TXT)' 
+      : currentScreen === 'docx-to-pdf'
+        ? 'Cola de Archivos (DOCX a PDF)'
+        : 'Cola de Archivos (DOCX a TXT)',
     clear: 'Limpiar Todo',
-    download: currentScreen === 'pdf-to-txt' ? 'Descargar .txt' : 'Descargar .pdf',
+    download: currentScreen === 'docx-to-pdf' ? 'Descargar .pdf' : 'Descargar .txt',
     delete: 'Eliminar',
     completed: 'Completado',
     error: 'Error'
@@ -40,6 +59,11 @@ const App: React.FC = () => {
       if (currentScreen === 'pdf-to-txt') {
         convertedName = file.name.replace(/\.pdf$/i, '.txt');
         // fallback in case replacement was skipped due to case sensitivity
+        if (!convertedName.endsWith('.txt')) {
+          convertedName += '.txt';
+        }
+      } else if (currentScreen === 'docx-to-txt') {
+        convertedName = file.name.replace(/\.docx$/i, '.txt');
         if (!convertedName.endsWith('.txt')) {
           convertedName += '.txt';
         }
@@ -83,6 +107,14 @@ const App: React.FC = () => {
       try {
         if (item.type === 'pdf-to-txt') {
           const result = await convertPdfLocal(item.file);
+          setQueue(prev => prev.map(q => q.id === item.id ? {
+            ...q,
+            status: ConversionStatus.COMPLETED,
+            resultContent: result,
+            convertedName: item.convertedName
+          } : q));
+        } else if (item.type === 'docx-to-txt') {
+          const result = await convertWordToTxtLocal(item.file);
           setQueue(prev => prev.map(q => q.id === item.id ? {
             ...q,
             status: ConversionStatus.COMPLETED,
@@ -139,11 +171,11 @@ const App: React.FC = () => {
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         
         {/* Navigation Tab Switcher */}
-        <div className="flex bg-zinc-900/80 border border-zinc-800 p-1.5 rounded-xl mb-12 w-full max-w-md mx-auto shadow-xl">
+        <div className="flex bg-zinc-900/80 border border-zinc-800 p-1.5 rounded-xl mb-12 w-full max-w-xl mx-auto shadow-xl">
           <button
             onClick={() => setCurrentScreen('pdf-to-txt')}
             disabled={isProcessing}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-sm transition-all focus:outline-none ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-bold text-xs sm:text-sm transition-all focus:outline-none ${
               currentScreen === 'pdf-to-txt'
                 ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
@@ -156,7 +188,7 @@ const App: React.FC = () => {
           <button
             onClick={() => setCurrentScreen('docx-to-pdf')}
             disabled={isProcessing}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-sm transition-all focus:outline-none ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-bold text-xs sm:text-sm transition-all focus:outline-none ${
               currentScreen === 'docx-to-pdf'
                 ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
@@ -165,6 +197,19 @@ const App: React.FC = () => {
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2a2 2 0 1 0 0-4H8v8"/><path d="M12 13h2a2 2 0 1 0 0-4h-2v8"/></svg>
             DOCX a PDF
+          </button>
+          <button
+            onClick={() => setCurrentScreen('docx-to-txt')}
+            disabled={isProcessing}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-bold text-xs sm:text-sm transition-all focus:outline-none ${
+              currentScreen === 'docx-to-txt'
+                ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+            } ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            id="tab-docx-to-txt"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><path d="M8 9h2v8H8z"/></svg>
+            DOCX a TXT
           </button>
         </div>
 
@@ -226,7 +271,7 @@ const App: React.FC = () => {
           items={filteredQueue} 
           onRemove={handleRemoveItem} 
           onClearAll={handleClearAll}
-          format={currentScreen === 'pdf-to-txt' ? OutputFormat.TXT : OutputFormat.PDF}
+          format={currentScreen === 'docx-to-pdf' ? OutputFormat.PDF : OutputFormat.TXT}
           language="es"
           texts={{
               queue: t.queue,

@@ -22,7 +22,7 @@ export interface FileQueueItem {
   errorMessage?: string;
   convertedName: string;
   timestamp: number;
-  type: 'pdf-to-txt' | 'docx-to-pdf';
+  type: 'pdf-to-txt' | 'docx-to-pdf' | 'docx-to-txt';
 }
 
 export interface ConversionSettings {
